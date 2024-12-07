@@ -1,11 +1,10 @@
 import os
-from dotenv import load_dotenv
 
 import checkPrice as cp
 import asyncio
 
 from aiogram import Bot, Router, F
-from aiogram.filters import CommandStart, Command, StateFilter
+from aiogram.filters import CommandStart
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
@@ -19,10 +18,8 @@ start_keyboard = ReplyKeyboardMarkup(keyboard=[
 crypto_ids = ['bitcoin', 'etherium', 'solana']
 
 router = Router()
-load_dotenv()
-bot = Bot(token=os.getenv('TOKEN'))
 
-async def check_price():
+async def check_price(bot: Bot):
     await asyncio.sleep(1)
     while True:
         await asyncio.sleep(20)
@@ -35,8 +32,8 @@ async def check_price():
                 if price >= alertPrice:
                     await bot.send_message(chat_id=os.getenv('CHAT_ID') ,text=f'{i} price is {price} usd')
                     cp.delete_task_in_file(coin)
-            except:
-                pass
+            except Exception as e:
+                print(e)
 
 class add_tasks(StatesGroup):
     coin_name = State()
