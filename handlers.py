@@ -5,15 +5,21 @@ import asyncio
 
 from aiogram import Bot, Router, F
 from aiogram.filters import CommandStart
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, CallbackQuery
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
 
 start_keyboard = ReplyKeyboardMarkup(keyboard=[
-    [KeyboardButton(text='add task📄')],
+    [KeyboardButton(text='add/edit task📄')],
     [KeyboardButton(text='delete task🗑')]
     ],
                                      resize_keyboard=True)
+
+async def delete_task_kb(coin_name):
+    builder = InlineKeyboardBuilder()
+    builder.button(text='delete', callback_data=f'delete_{coin_name}')
+    return builder.as_markup()
 
 crypto_ids = ['bitcoin', 'etherium', 'solana']
 
@@ -43,7 +49,7 @@ class add_tasks(StatesGroup):
 async def cmd_start(message: Message):
     await message.answer('Welcome to crypto price tracker bot', reply_markup=start_keyboard)
 
-@router.message(F.text == 'add task📄')
+@router.message(F.text == 'add/edit task📄')
 async def add_task(message: Message, state: FSMContext):
     await message.answer('Enter coin name')
     await state.set_state(add_tasks.coin_name)
@@ -72,16 +78,16 @@ async def add_task(message: Message, state: FSMContext):
 
 @router.message(F.text == 'delete task🗑')
 async def delete_task(message: Message, state: FSMContext):
-    await message.answer('Enter coin name')
-    await state.set_state(add_tasks.coin_name)
-
-@router.message(add_tasks.coin_name)
-async def delete_task(message: Message, state: FSMContext):
-    await state.update_data(coin_name=message.text)
-    data = await state.get_data()
-    if data['coin_name'] in crypto_ids:
-        cp.delete_task_in_file(data['coin_name'])    
-        await message.answer('task deleted✅')
+    tasks = cp.read_task_file()
+    if tasks:
+        await message.answer('Your tasks:')
+        for coin in tasks:
+            await message.answer(f'{coin}\nalert price: {tasks[coin]}', reply_markup=await delete_task_kb(coin))
     else:
-        await message.answer('cannot find this task')
-    await state.clear()
+        await message.answer('You have no tasks❌')
+
+@router.callback_query(F.data.startswith('delete_'))
+async def delete_task(callback: CallbackQuery):
+    coin_name = callback.data.split('_')[1]
+    cp.delete_task_in_file(coin_name)
+    await callback.message.edit_text('task deleted✅')
